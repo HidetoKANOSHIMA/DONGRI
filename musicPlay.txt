@@ -1,0 +1,84 @@
+"PLAY.DULATIONBASE" FORGET DROP ;
+
+: PLAY.DULATIONBASE <VAR> ; // Multiples of 3 (600 - Standard)
+: PLAY.OCTAVE <VAR> ;	    // 5, 6, 7(Standard), 8, 9
+: PLAY.NOTELENGTH <VAR> ;   // ZEN(4), 2BU(3), 4BU(2 - Standerd), 8BU(1), 16BU(0)
+: PLAY.NOTEHALF <VAR> ;     // '-'(-1) or 0 or '+'(+1)
+: PLAY.NOTEGAP <VAR> ;      // GAP(ms)  |---Sound---|-Gap-|
+					        //          |--Duration-100%--|
+: PLAY.PORT     12 ;        // Port# for play.
+: PLAY.INIT
+    600 PLAY.DULATIONBASE VAR!	// (ms) as a time of ♪
+    '7' PLAY.OCTAVE VAR!
+    '2' PLAY.NOTELENGTH VAR!
+    30 PLAY.NOTEGAP VAR! ;
+: PLAY.NOTEHALF_CLEAR 0 PLAY.NOTEHALF VAR! ; 
+
+: PLAY.MIDIFREQ 69 - 12.0 / 2 SWAP POW 440 * ;
+
+: PLAY.SCALE                // 'A' ~ 'G' -> Freq
+  0xDF &                    // toupper
+  DUP 'A' = IF DROP EXIT(69) THEN
+  DUP 'B' = IF DROP EXIT(71) THEN
+  DUP 'C' = IF DROP EXIT(72) THEN
+  DUP 'D' = IF DROP EXIT(74) THEN
+  DUP 'E' = IF DROP EXIT(76) THEN
+  DUP 'F' = IF DROP EXIT(77) THEN
+  DUP 'G' = IF DROP EXIT(79) THEN
+    DROP 0 ;
+
+: PLAY.GETFREQ
+    PLAY.SCALE, PLAY.NOTEHALF VAR@ +, PLAY.OCTAVE VAR@ '7' - 12 * + // Scale, half scale, octave.
+    PLAY.MIDIFREQ ;         // Convert scale to freq.
+
+: PLAY.GETNOTELENGTH
+    PLAY.NOTELENGTH VAR@ '2' -, 2.0 SWAP POW, PLAY.DULATIONBASE VAR@ *
+    PLAY.NOTEGAP VAR@ - ;
+
+: PLAY.WAIT_TONEAFTER
+    PLAY.GETNOTELENGTH DELAY
+    NOTONE(PLAY.PORT), DELAY(PLAY.NOTEGAP VAR@) ;
+
+: PLAY.WAIT_TONEAFTER_TRIPLET
+    PLAY.GETNOTELENGTH 3 / DELAY
+    NOTONE(PLAY.PORT), DELAY(PLAY.NOTEGAP VAR@ 3 /) ;
+
+: PLAY.BODY                 // MML Command -> .
+        DUP 'A' 'G' INRANGE
+        IF PLAY.GETFREQ, PLAY.PORT SWAP TONE    // Do tone.
+            PLAY.WAIT_TONEAFTER
+            PLAY.NOTEHALF_CLEAR EXIT
+        THEN
+        //
+        DUP 'a' 'g' INRANGE
+        IF PLAY.GETFREQ, PLAY.PORT SWAP TONE    // Do tone.
+            PLAY.WAIT_TONEAFTER_TRIPLET
+            PLAY.NOTEHALF_CLEAR EXIT
+        THEN
+        //
+        DUP '5' '9' INRANGE
+        IF PLAY.OCTAVE VAR! EXIT
+        THEN
+        //
+        DUP '0' '4' INRANGE
+        IF PLAY.NOTELENGTH VAR! EXIT
+        THEN
+        //
+        DUP '-' = IF -1 PLAY.NOTEHALF VAR!, DROP EXIT THEN
+        DUP '+' = IF  1 PLAY.NOTEHALF VAR!, DROP EXIT THEN
+        DUP '_' = IF  NOTONE(PLAY.PORT), PLAY.WAIT_TONEAFTER, DROP EXIT THEN
+        //
+        DROP ;
+: PLAY                      // PlayString "CDEFEDC"
+    PLAY.INIT
+    BEGIN
+    DUP B@
+    WHILE                   // DO while not tail of string(\0).
+//        DUP B@ C. CRLF
+        DUP B@ PLAY.BODY
+        1+
+    REPEAT
+    DROP ;
+    
+    "72G1EEFEDCGGEE2D" play
+
